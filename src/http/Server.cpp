@@ -89,7 +89,7 @@ void HttpServer::run(int thread_num, int max_queque_size) {
 
   // non-clocking 循环接受请求，核心逻辑，在poll里面做
   while (true) {
-
+    // 核心是epoll_wait 返回 events
     std::vector<std::shared_ptr<HttpData>> events =
         Epoll::poll(serverSocket, 1024, -1);
 

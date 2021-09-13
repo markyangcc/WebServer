@@ -21,7 +21,7 @@ ThreadPool::ThreadPool(int thread_s, int max_queue_s)
     // thread 只能 move 不能 copy和 assign
     threads[i] = move(std::thread(worker, this));
     threads[i].detach();
-    // threads.emplace_back(worker, this); // 原地构造,但是不好detach
+    // threads.emplace_back(worker, this); // 原地构造,但是不好detach，用 Lambda??
     // 目前没有想到分离的简便写法或许count++ 再 detach可以
     started_++;
   }

@@ -1,7 +1,10 @@
 #include "../include/Epoll.h"
-#include "../include/Util.h"
+
 #include <sys/epoll.h>
+
 #include <vector>
+
+#include "../include/Util.h"
 
 std::unordered_map<int, std::shared_ptr<HttpData>> Epoll::httpDataMap;
 
@@ -80,7 +83,6 @@ int Epoll::delfd(int epoll_fd, int fd, __uint32_t events) {
 
 // listenfd 新的连接
 void Epoll::handleConnection(const ServerSocket &serverSocket) {
-
   std::shared_ptr<ClientSocket> newClient(new ClientSocket);
   // epoll 是ET模式，循环接收连接
   // 需要将listen_fd设置为non-blocking
@@ -115,9 +117,9 @@ void Epoll::handleConnection(const ServerSocket &serverSocket) {
   }
 }
 
-std::vector<std::shared_ptr<HttpData>>
-Epoll::poll(const ServerSocket &serverSocket, int max_event, int timeout) {
-
+// epoll poll(epoll_wait)
+std::vector<std::shared_ptr<HttpData>> Epoll::poll(
+    const ServerSocket &serverSocket, int max_event, int timeout) {
   int nfds = epoll_wait(serverSocket.epoll_fd, events, max_event, timeout);
 
   if (nfds == -1) {
@@ -132,23 +134,22 @@ Epoll::poll(const ServerSocket &serverSocket, int max_event, int timeout) {
       exit(-1);
     }
   }
+  // return 给 ThreadPool IO 线程处理的vector
+  std::vector<std::shared_ptr<HttpData>> httpDatas;
 
   // epoll ET + non-blocking 核心逻辑处理
-  std::vector<std::shared_ptr<HttpData>> httpDatas;
   // 遍历events集合
   for (int i = 0; i < nfds; i++) {
     int fd = events[i].data.fd;
 
     if (fd == serverSocket.listen_fd) {
       // 防止可能有的假触发
-      if (events[i].events & EPOLLIN)
-        handleConnection(serverSocket);
+      if (events[i].events & EPOLLIN) handleConnection(serverSocket);
     }
     // 出错的描述符，移除定时器， 关闭文件描述符
     // //增加 EPOLLRDHUP事件，表示对端断开连接
     else if ((events[i].events & EPOLLERR) || (events[i].events & EPOLLRDHUP) ||
              (events[i].events & EPOLLHUP)) {
-
       auto it = httpDataMap.find(fd);
 
       if (it != httpDataMap.end()) {
@@ -161,7 +162,6 @@ Epoll::poll(const ServerSocket &serverSocket, int max_event, int timeout) {
     }
     //如果是可读事件
     else if (events[i].events & EPOLLIN) {
-
       auto it = httpDataMap.find(fd);
       if (it != httpDataMap.end()) {
         // EPOLLPRI 紧急数据事件
@@ -179,5 +179,6 @@ Epoll::poll(const ServerSocket &serverSocket, int max_event, int timeout) {
       // 这里有个问题是 TimerNode正常超时释放时
     }
   }
+  
   return httpDatas;
 }
